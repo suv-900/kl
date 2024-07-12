@@ -5,7 +5,8 @@ import (
 	"github.com/suv-900/kl/controllers"
 )
 
-func SetupRouter(r *gin.Engine) {
-	r.GET("/server-status", controllers.ServerStatus)
-	r.POST("/adduser", controllers.AddUser)
+func SetupRouter(e *gin.Engine) {
+
+	e.GET("/server-status", controllers.ServerStatus)
+	e.POST("/adduser", controllers.AddUser)
 }
