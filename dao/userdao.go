@@ -8,7 +8,7 @@ import (
 )
 
 // should have updated userid no need to return id
-func CreateUser(user models.User) error {
+func AddUser(user models.User) error {
 	t := db.Create(&user)
 	if t.Error != nil {
 		log.Fatalf("Couldnt create user:%s", t.Error)
