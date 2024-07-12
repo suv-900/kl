@@ -1,9 +1,13 @@
 package main
 
 import (
-	"github.com/suv-900/kl/dao"
+	"github.com/gin-gonic/gin"
+	"github.com/suv-900/kl/router"
 )
 
 func main() {
-	dao.ConnectDB()
+	r := gin.Default()
+	router.SetupRouter(r)
+
+	r.Run()
 }
