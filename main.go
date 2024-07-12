@@ -6,8 +6,8 @@ import (
 )
 
 func main() {
-	r := gin.Default()
-	router.SetupRouter(r)
+	engine := gin.Default()
+	router.SetupRouter(engine)
 
-	r.Run()
+	engine.Run()
 }
