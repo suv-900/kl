@@ -2,23 +2,28 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/op/go-logging"
+
 	"github.com/suv-900/kl/config"
-	"github.com/suv-900/kl/utils"
+	"github.com/suv-900/kl/dao"
+	"github.com/suv-900/kl/logging"
 )
 
-var log *logging.Logger
+var log = logging.GetLogger()
 
 func main() {
-	//initiate logger
-	log = utils.GetLogger()
 
-	c := config.Config{}
-	if err := c.LoadEnv(); err != nil {
+	if err := config.LoadEnv(); err != nil {
 		log.Critical(err)
 		return
 	}
-	log.Info("config ", c)
+	log.Info("Created Config.")
+	if err := dao.Init(); err != nil {
+		log.Error(err)
+		return
+	}
+	log.Info("DB connection successfull")
+
+	log.Info("Chores complete")
 	engine := gin.New()
 	engine.Run()
 }
