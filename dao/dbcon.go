@@ -11,12 +11,17 @@ import (
 
 var db *gorm.DB
 
-func Init(c *config.Config) error {
+func Init() error {
 	var err error
-	dsn := fmt.Sprintf("host=%d user=%s password=%s dbname=%s", c.Host, c.DBUsername, c.DBPassword, c.DBName)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s",
+		config.Config.Host,
+		config.Config.DBUsername,
+		config.Config.DBPassword,
+		config.Config.DBName)
+
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Couldnt connect to DB:%s", err)
+		log.Fatalf("Couldnt connect to DB :%s", err)
 		return err
 	}
 	return nil
