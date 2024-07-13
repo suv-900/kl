@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/suv-900/kl/config"
+	"github.com/suv-900/kl/common"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -14,10 +14,10 @@ var db *gorm.DB
 func Init() error {
 	var err error
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s",
-		config.Config.Host,
-		config.Config.DBUsername,
-		config.Config.DBPassword,
-		config.Config.DBName)
+		common.Config.Host,
+		common.Config.DBUsername,
+		common.Config.DBPassword,
+		common.Config.DBName)
 
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {

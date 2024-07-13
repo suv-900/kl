@@ -1,11 +1,11 @@
 package utils
 
 import (
-	"github.com/suv-900/kl/config"
+	"github.com/suv-900/kl/common"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var bcryptCost = config.Config.BCryptCost
+var bcryptCost = common.Config.BCryptCost
 
 func GenerateHashedPassword(password string) (string, error) {
 	var hashedpass string

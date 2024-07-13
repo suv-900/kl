@@ -1,4 +1,4 @@
-package config
+package common
 
 import (
 	"errors"
@@ -17,6 +17,7 @@ type Configuration struct {
 	DBPassword string
 
 	BCryptCost int
+	JWTkey     string
 }
 
 var Config *Configuration
@@ -51,6 +52,12 @@ func LoadEnv() error {
 	Config.Host, present = os.LookupEnv("host")
 	if !present {
 		log.Error("host not found in .env file")
+		return errors.New("read .env:unsuccessfull")
+	}
+
+	Config.JWTkey, present = os.LookupEnv("jwt-key")
+	if !present {
+		log.Error("jwtkey not found in .env file")
 		return errors.New("read .env:unsuccessfull")
 	}
 

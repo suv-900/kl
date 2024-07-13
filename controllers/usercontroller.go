@@ -4,12 +4,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/suv-900/kl/dao"
 	"github.com/suv-900/kl/models"
 )
 
 func ServerStatus(c *gin.Context) {
-	c.Status(http.StatusOK)
 }
 
 func AddUser(c *gin.Context) {
@@ -17,7 +15,8 @@ func AddUser(c *gin.Context) {
 
 	err := c.ShouldBindJSON(&user)
 	if err != nil {
-		c.AbortWithStatus(http.StatusUnprocessableEntity)
+		// c.AbortWithStatus(http.StatusUnprocessableEntity)
+		c.Status(http.StatusUnprocessableEntity)
 		return
 	}
 	err = user.Validate()
@@ -25,12 +24,8 @@ func AddUser(c *gin.Context) {
 		// //aborts and stores the error
 		// c.AbortWithError(http.StatusBadRequest,err)
 		//why even care about such errors
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.Status(http.StatusBadRequest)
 		return
 	}
-	err = dao.AddUser(user)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
+
 }

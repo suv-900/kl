@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/suv-900/kl/config"
+	"github.com/suv-900/kl/common"
 	"github.com/suv-900/kl/dao"
 	"github.com/suv-900/kl/logging"
 )
@@ -12,7 +12,7 @@ var log = logging.GetLogger()
 
 func main() {
 
-	if err := config.LoadEnv(); err != nil {
+	if err := common.LoadEnv(); err != nil {
 		log.Critical(err)
 		return
 	}
