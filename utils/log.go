@@ -1,16 +1,15 @@
 package utils
 
 import (
-	"log"
 	"os"
 
 	"github.com/op/go-logging"
 )
 
-var Log *logging.Logger
+var log *logging.Logger
 
-func InitLogger() {
-	Log = logging.MustGetLogger("atlas_logger")
+func initLogger() {
+	log = logging.MustGetLogger("atlas_logger")
 	var format = logging.MustStringFormatter(
 		`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`)
 
@@ -21,10 +20,10 @@ func InitLogger() {
 }
 
 func GetLogger() *logging.Logger {
-	if Log != nil {
-		return Log
+	if log != nil {
+		return log
 	} else {
-		log.Panic("Logger is nil")
-		return nil
+		initLogger()
+		return log
 	}
 }
