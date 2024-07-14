@@ -20,7 +20,7 @@ type Configuration struct {
 	JWTkey     string
 }
 
-var Config *Configuration
+var Config = Configuration{}
 
 var defaultBcryptCost = 3
 
@@ -29,7 +29,7 @@ var log = logging.GetLogger()
 func LoadEnv() error {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Error("Couldnt load .env:%s", err)
+		log.Error("Couldnt load .env: ", err)
 		return err
 	}
 	var present bool
@@ -55,7 +55,7 @@ func LoadEnv() error {
 		return errors.New("read .env:unsuccessfull")
 	}
 
-	Config.JWTkey, present = os.LookupEnv("jwt-key")
+	Config.JWTkey, present = os.LookupEnv("jwt_key")
 	if !present {
 		log.Error("jwtkey not found in .env file")
 		return errors.New("read .env:unsuccessfull")
@@ -76,4 +76,12 @@ func LoadEnv() error {
 	}
 
 	return nil
+}
+
+func init() {
+	log.Info("Init Config file.")
+	err := LoadEnv()
+	if err != nil {
+		log.Panic(err)
+	}
 }
