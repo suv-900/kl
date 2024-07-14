@@ -7,11 +7,17 @@ import (
 
 var bcryptCost = common.Config.BCryptCost
 
-func GenerateHashedPassword(password string) (string, error) {
+func GenerateHashedPassword(password []byte) (string, error) {
 	var hashedpass string
-	hashedbytes, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	hashedbytes, err := bcrypt.GenerateFromPassword(password, bcryptCost)
 	if err != nil {
+		log.Error(err)
 		return hashedpass, err
 	}
 	return string(hashedbytes), nil
+}
+
+// nil on success and err on fail
+func PasswordValidator(password []byte, dbPassword []byte) error {
+	return bcrypt.CompareHashAndPassword(dbPassword, password)
 }
