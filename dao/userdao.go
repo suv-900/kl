@@ -1,11 +1,14 @@
 package dao
 
 import (
+	"errors"
 	"fmt"
-	"log"
 
+	"github.com/suv-900/kl/logging"
 	"github.com/suv-900/kl/models"
 )
+
+var log = logging.GetLogger()
 
 // should have updated userid no need to return id
 func AddUser(user models.User) error {
@@ -16,6 +19,22 @@ func AddUser(user models.User) error {
 	}
 	fmt.Printf("Rows affected:%d", t.RowsAffected)
 	return nil
+}
+
+// sneaky
+func CheckUserExists(username string) bool {
+	r := db.Where(&models.User{Username: username})
+	return r.RowsAffected > 0
+}
+
+func GetUserPassword(username string) (string, error) {
+	var pass string
+	r := db.Where("username = ?", username).Select("password").Find(&pass)
+	if r.RowsAffected == 0 {
+		log.Error("User not found to retrive password")
+		return "", errors.New("user not found to retreive password")
+	}
+	return pass, nil
 }
 
 // see what are sql.Rows
@@ -38,6 +57,11 @@ func DeleteUser(userid uint) error {
 // no create for userprofile
 func UpdateUserProfile(userProfile models.UserProfile) error {
 	t := db.Save(userProfile)
+	return t.Error
+}
+
+func UpdateProfilePicture(image *models.Image) error {
+	t := db.Save(image)
 	return t.Error
 }
 
