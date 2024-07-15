@@ -2,9 +2,9 @@ package dao
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/suv-900/kl/common"
+	"github.com/suv-900/kl/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -21,9 +21,19 @@ func Init() error {
 
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Couldnt connect to DB :%s", err)
+		log.Errorf("couldnt connect to DB :%s", err)
 		return err
 	}
+	err = db.AutoMigrate(&models.User{},
+		&models.Image{},
+		&models.UserProfile{})
+	if err != nil {
+		log.Errorf("couldnt migrate schemas:%s", err)
+		return err
+	}
+
+	log.Info("schema migraton successfull.")
+
 	return nil
 }
 
