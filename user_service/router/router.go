@@ -7,6 +7,7 @@ import (
 
 func SetupRouter(e *gin.Engine) {
 	e.GET("/ping", controllers.Ping)
+	e.GET("/v/user-pfp", controllers.GetUserProfilePicture)
 	e.POST("/adduser", controllers.AddUser)
 	e.POST("/v/add-picture", controllers.UpdateProfilePicture)
 }

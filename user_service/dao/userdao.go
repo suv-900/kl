@@ -59,7 +59,11 @@ func UpdateUserProfile(userProfile models.UserProfile) error {
 	t := db.Save(userProfile)
 	return t.Error
 }
-
+func GetUserProfilePicture() (*models.Image, error) {
+	var image models.Image
+	t := db.Where("id = ?", 10).Find(&image)
+	return &image, t.Error
+}
 func UpdateProfilePicture(image *models.Image) error {
 	t := db.Save(image)
 	return t.Error

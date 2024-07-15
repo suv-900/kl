@@ -118,7 +118,6 @@ func LoginUser(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-
 	dbpassword, err := dao.GetUserPassword(user.Username)
 	if err != nil {
 		c.JSON(http.StatusNotFound, err)
