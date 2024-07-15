@@ -18,6 +18,6 @@ func GenerateHashedPassword(password []byte) (string, error) {
 }
 
 // nil on success and err on fail
-func PasswordValidator(password []byte, dbPassword []byte) error {
+func ComparePassword(password []byte, dbPassword []byte) error {
 	return bcrypt.CompareHashAndPassword(dbPassword, password)
 }
