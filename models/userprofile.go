@@ -17,10 +17,9 @@ type UserProfile struct {
 
 type Image struct {
 	gorm.Model
-	Binary []byte
-	Name   string
-	Size   int64
-
-	UserID uint
-	User   User `gorm:"constraint:OnDelete:CASCADE;"`
+	Name     string
+	Size     int64
+	Location string
+	// UserID uint
+	// User   User `gorm:"constraint:OnDelete:CASCADE;"`
 }

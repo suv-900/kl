@@ -10,6 +10,8 @@ import (
 	"github.com/suv-900/kl/utils"
 )
 
+var imagesDir = "/home/core/go/kl/store/images"
+
 var log = logging.GetLogger()
 
 func Ping(c *gin.Context) {
@@ -69,30 +71,26 @@ func CheckUserExists(c *gin.Context) {
 func UpdateProfilePicture(c *gin.Context) {
 	f, err := c.FormFile("image")
 	if err != nil {
+		log.Error(err)
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
+	dest := imagesDir + "/" + f.Filename
+	log.Info(dest)
+	if err := c.SaveUploadedFile(f, dest); err != nil {
+		log.Error(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 	image := &models.Image{}
 
 	image.Name = f.Filename
 	image.Size = f.Size
-
-	file, err := f.Open()
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	image.Binary = make([]byte, image.Size)
-	_, err = file.Read(image.Binary)
-
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
+	image.Location = dest
 
 	if err := dao.UpdateProfilePicture(image); err != nil {
+		log.Error(err)
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -100,14 +98,22 @@ func UpdateProfilePicture(c *gin.Context) {
 	log.Info("Image added.")
 	c.Status(http.StatusOK)
 }
-
+func GetUserProfilePicture(c *gin.Context) {
+	image, err := dao.GetUserProfilePicture()
+	if err != nil {
+		log.Error(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusOK)
+	c.File(image.Location)
+}
 func LoginUser(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.Status(http.StatusUnprocessableEntity)
 		return
 	}
-
 	if len(user.Username) == 0 || len(user.Password) == 0 {
 		c.Status(http.StatusBadRequest)
 		return
