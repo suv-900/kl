@@ -1,0 +1,6 @@
+user_service/.env
+user_service/go.sum
+
+image_service/go.sum
+
+note
