@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/suv-900/kl/common"
-	"github.com/suv-900/kl/logging"
+	"github.com/suv-900/kl/user_service/common"
+	"github.com/suv-900/kl/user_service/logging"
 )
 
 var JWTKEY = common.Config.JWTkey

@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
-	"github.com/suv-900/kl/logging"
+	"github.com/suv-900/kl/user_service/logging"
 )
 
 // Application Configuraton

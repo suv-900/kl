@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/suv-900/kl/common"
+	"github.com/suv-900/kl/user_service/common"
 	"golang.org/x/crypto/bcrypt"
 )
 

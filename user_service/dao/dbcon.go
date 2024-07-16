@@ -3,8 +3,8 @@ package dao
 import (
 	"fmt"
 
-	"github.com/suv-900/kl/common"
-	"github.com/suv-900/kl/models"
+	"github.com/suv-900/kl/user_service/common"
+	"github.com/suv-900/kl/user_service/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

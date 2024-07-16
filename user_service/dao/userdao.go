@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/suv-900/kl/logging"
-	"github.com/suv-900/kl/models"
+	"github.com/suv-900/kl/user_service/logging"
+	"github.com/suv-900/kl/user_service/models"
 )
 
 var log = logging.GetLogger()
@@ -32,7 +32,10 @@ func CheckUserExists(username string) bool {
 	r := db.Where(&models.User{Username: username})
 	return r.RowsAffected > 0
 }
-
+func UpdateUserProfile(userProfile models.UserProfile) error {
+	t := db.Save(&userProfile)
+	return t.Error
+}
 func GetLoginAttempts(username string) (*LoginAttemptsResult, error) {
 	var result LoginAttemptsResult
 	t := db.Raw("SELECT failed_login_attempts,failed_login_time FROM users WHERE username = ?", username).Scan(&result)

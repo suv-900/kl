@@ -5,50 +5,21 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/suv-900/kl/dao"
-	"github.com/suv-900/kl/logging"
-	"github.com/suv-900/kl/models"
-	"github.com/suv-900/kl/utils"
+	"github.com/suv-900/kl/user_service/dao"
+	"github.com/suv-900/kl/user_service/logging"
+	"github.com/suv-900/kl/user_service/models"
+	"github.com/suv-900/kl/user_service/utils"
 )
 
-var imagesDir = "/home/core/go/kl/store/images"
-var videosDir = "/home/core/go/kl/store/videos"
+var videosDir = "/home/core/go/kl/user_service/store/videos"
+var imagesDir = "/home/core/go/kl/user_service/store/images"
 
 var log = logging.GetLogger()
 
 func Ping(c *gin.Context) {
 	c.JSON(http.StatusOK, "pong")
 }
-func UpdatePassword(c *gin.Context) {
-	token := c.GetHeader("token")
 
-	tokenExpired, userid, tokenInvalid := utils.ValidateToken(token)
-
-	if tokenExpired {
-		c.Status(http.StatusBadRequest)
-		return
-	}
-	if tokenInvalid {
-		c.Status(http.StatusUnauthorized)
-	}
-
-	var password string
-	c.ShouldBindJSON(&password)
-
-	password, err := utils.GenerateHashedPassword([]byte(password))
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	err = dao.ChangePassword(userid, password)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	c.Status(http.StatusOK)
-}
 func AddUser(c *gin.Context) {
 	var user models.User
 	err := c.ShouldBindJSON(&user)
@@ -150,6 +121,64 @@ func CheckUserExists(c *gin.Context) {
 		return
 	}
 }
+func UpdatePassword(c *gin.Context) {
+	token := c.GetHeader("token")
+
+	tokenExpired, userid, tokenInvalid := utils.ValidateToken(token)
+
+	if tokenExpired {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	if tokenInvalid {
+		c.Status(http.StatusUnauthorized)
+	}
+
+	var password string
+	if err := c.ShouldBindJSON(&password); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	password, err := utils.GenerateHashedPassword([]byte(password))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	err = dao.ChangePassword(userid, password)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func UpdateUserProfile(c *gin.Context) {
+	//get userid
+	//handler failure log it out
+	value, exists := c.Get("userid")
+	if !exists {
+		log.Error("userid not found in context map")
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if value == nil {
+		log.Error("Unknown state:userid is nill")
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	var userProfile models.UserProfile
+
+	if err := c.ShouldBindJSON(&userProfile); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+}
 
 func UpdateProfilePicture(c *gin.Context) {
 	f, err := c.FormFile("image")
@@ -199,7 +228,10 @@ func SaveVideo(c *gin.Context) {
 	}
 	c.Status(http.StatusOK)
 }
-
+func ServerVideo(c *gin.Context) {
+	c.Status(http.StatusOK)
+	c.File(videosDir + "/dogvideo.mp4")
+}
 func GetUserProfilePicture(c *gin.Context) {
 	image, err := dao.GetUserProfilePicture()
 	if err != nil {
