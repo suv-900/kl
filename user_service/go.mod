@@ -1,4 +1,4 @@
-module github.com/suv-900/kl
+module github.com/suv-900/kl/user_service
 
 go 1.20
 
