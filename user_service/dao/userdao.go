@@ -3,12 +3,18 @@ package dao
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/suv-900/kl/logging"
 	"github.com/suv-900/kl/models"
 )
 
 var log = logging.GetLogger()
+
+type LoginAttemptsResult struct {
+	FailedLoginAttempts uint
+	FailedLoginTime     time.Time
+}
 
 // should have updated userid no need to return id
 func AddUser(user models.User) error {
@@ -27,6 +33,23 @@ func CheckUserExists(username string) bool {
 	return r.RowsAffected > 0
 }
 
+func GetLoginAttempts(username string) (*LoginAttemptsResult, error) {
+	var result LoginAttemptsResult
+	t := db.Raw("SELECT failed_login_attempts,failed_login_time FROM users WHERE username = ?", username).Scan(&result)
+	return &result, t.Error
+}
+
+func UpdateLoginAttempts(username string) error {
+	t := db.Raw(`UPDATE users SET 
+	failed_login_attempts = failed_login_attempts + 1,
+	failed_login_time = ? WHERE username = ?`, time.Now(), username)
+	return t.Error
+}
+func ResetLoginAttempts(username string) error {
+	t := db.Raw(`UPDATE users SET 
+	failed_login_attempts = 0 WHERE username = ?`, username)
+	return t.Error
+}
 func GetUserPassword(username string) (string, error) {
 	var pass string
 	r := db.Where("username = ?", username).Select("password").Find(&pass)
@@ -43,7 +66,10 @@ func GetUser(userid uint) (models.User, error) {
 	t := db.First(&user, userid)
 	return user, t.Error
 }
-
+func ChangePassword(userid uint, password string) error {
+	err := db.Save(&models.User{ID: userid, Password: password}).Error
+	return err
+}
 func UpdateUser(user models.User) error {
 	t := db.Save(user)
 	return t.Error
@@ -72,5 +98,11 @@ func UpdateProfilePicture(image *models.Image) error {
 func FindSoftDeletedRecords() ([]models.User, error) {
 	var users []models.User
 	t := db.Where("is_del = 1").Find(&users)
+	return users, t.Error
+}
+
+func FindActiveUsers() ([]models.User, error) {
+	var users []models.User
+	t := db.Where("active = ?", true).Find(&users)
 	return users, t.Error
 }

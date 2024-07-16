@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/suv-900/kl/dao"
@@ -11,13 +12,43 @@ import (
 )
 
 var imagesDir = "/home/core/go/kl/store/images"
+var videosDir = "/home/core/go/kl/store/videos"
 
 var log = logging.GetLogger()
 
 func Ping(c *gin.Context) {
 	c.JSON(http.StatusOK, "pong")
 }
+func UpdatePassword(c *gin.Context) {
+	token := c.GetHeader("token")
 
+	tokenExpired, userid, tokenInvalid := utils.ValidateToken(token)
+
+	if tokenExpired {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	if tokenInvalid {
+		c.Status(http.StatusUnauthorized)
+	}
+
+	var password string
+	c.ShouldBindJSON(&password)
+
+	password, err := utils.GenerateHashedPassword([]byte(password))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	err = dao.ChangePassword(userid, password)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
 func AddUser(c *gin.Context) {
 	var user models.User
 	err := c.ShouldBindJSON(&user)
@@ -53,6 +84,58 @@ func AddUser(c *gin.Context) {
 	c.Status(http.StatusCreated)
 }
 
+func LoginUser(c *gin.Context) {
+	var user models.User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.Status(http.StatusUnprocessableEntity)
+		return
+	}
+	if len(user.Username) == 0 || len(user.Password) == 0 {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	//check login attempts
+	loginAttempts, err := dao.GetLoginAttempts(user.Username)
+	if err != nil {
+		log.Error("error while getting login attempts details ", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if loginAttempts.FailedLoginAttempts > 5 {
+		timeNow := time.Now()
+		timeDiff := loginAttempts.FailedLoginTime.Sub(timeNow)
+
+		if timeDiff.Abs().Hours() < 2 {
+			c.Status(http.StatusUnauthorized)
+			return
+		} else {
+			//set login attempts to 0
+			err = dao.ResetLoginAttempts(user.Username)
+			if err != nil {
+				log.Error("error while reseting login attempts ", err)
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	dbpassword, err := dao.GetUserPassword(user.Username)
+	if err != nil {
+		c.JSON(http.StatusNotFound, err)
+		return
+	}
+	if mismatch := utils.ComparePassword([]byte(user.Password), []byte(dbpassword)); mismatch != nil {
+		if err := dao.UpdateLoginAttempts(user.Username); err != nil {
+			log.Error("error while updating login attempts ", err)
+		}
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
 func CheckUserExists(c *gin.Context) {
 	username := c.Param("username")
 	if len(username) == 0 {
@@ -83,21 +166,40 @@ func UpdateProfilePicture(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	image := &models.Image{}
+	// image := &models.Image{}
 
-	image.Name = f.Filename
-	image.Size = f.Size
-	image.Location = dest
+	// image.Name = f.Filename
+	// image.Size = f.Size
+	// image.Location = dest
 
-	if err := dao.UpdateProfilePicture(image); err != nil {
-		log.Error(err)
-		c.Status(http.StatusInternalServerError)
-		return
-	}
+	// if err := dao.UpdateProfilePicture(image); err != nil {
+	// 	log.Error(err)
+	// 	c.Status(http.StatusInternalServerError)
+	// 	return
+	// }
 
 	log.Info("Image added.")
 	c.Status(http.StatusOK)
 }
+
+func SaveVideo(c *gin.Context) {
+	f, err := c.FormFile("video")
+	if err != nil {
+		log.Error(err)
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	dest := videosDir + "/" + f.Filename
+	log.Info(dest)
+	if err := c.SaveUploadedFile(f, dest); err != nil {
+		log.Error(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusOK)
+}
+
 func GetUserProfilePicture(c *gin.Context) {
 	image, err := dao.GetUserProfilePicture()
 	if err != nil {
@@ -108,27 +210,26 @@ func GetUserProfilePicture(c *gin.Context) {
 	c.Status(http.StatusOK)
 	c.File(image.Location)
 }
-func LoginUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.Status(http.StatusUnprocessableEntity)
-		return
-	}
-	if len(user.Username) == 0 || len(user.Password) == 0 {
-		c.Status(http.StatusBadRequest)
-		return
-	}
-	dbpassword, err := dao.GetUserPassword(user.Username)
+
+// use protobufs
+func GetDeletedUsers(c *gin.Context) {
+	deletedUsers, err := dao.FindSoftDeletedRecords()
 	if err != nil {
-		c.JSON(http.StatusNotFound, err)
-		return
-	}
-	if mismatch := utils.ComparePassword([]byte(user.Password), []byte(dbpassword)); mismatch != nil {
-		c.Status(http.StatusUnauthorized)
+		log.Error(err)
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, deletedUsers)
 }
 
-// c.SetCookie("token", s, 3600, "/", "localhost", false, true)
+// probably huge
+func GetAllActiveUsers(c *gin.Context) {
+	activeUsers, err := dao.FindActiveUsers()
+	if err != nil {
+		log.Error(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, activeUsers)
+}

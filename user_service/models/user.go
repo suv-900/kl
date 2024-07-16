@@ -2,18 +2,25 @@ package models
 
 import (
 	"errors"
+	"time"
 
-	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
 )
 
 type User struct {
-	gorm.Model
+	ID        uint `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Active   bool
-	IsDel    soft_delete.DeletedAt `gorm:"softDelete:flag,DeletedAtField:DeletedAt"`
+
+	FailedLoginAttempts uint
+	FailedLoginTime     time.Time
+
+	IsDel soft_delete.DeletedAt `gorm:"softDelete:flag,DeletedAtField:DeletedAt"`
 }
 
 func (u *User) Validate() error {
