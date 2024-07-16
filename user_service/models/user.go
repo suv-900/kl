@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
 )
 
@@ -21,6 +22,23 @@ type User struct {
 	FailedLoginTime     time.Time
 
 	IsDel soft_delete.DeletedAt `gorm:"softDelete:flag,DeletedAtField:DeletedAt"`
+}
+type UserProfile struct {
+	gorm.Model
+	Bio       string
+	BirthDate time.Time
+
+	UserID uint
+	User   User `gorm:"constraint:OnDelete:CASCADE;"`
+}
+
+type Image struct {
+	gorm.Model
+	Name     string
+	Size     int64
+	Location string
+	// UserID uint
+	// User   User `gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 func (u *User) Validate() error {
