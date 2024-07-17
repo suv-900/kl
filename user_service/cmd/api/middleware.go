@@ -23,6 +23,9 @@ func (app *application) authenticator(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+			//unknown request send 401 response
+		}
 
 	}
 
