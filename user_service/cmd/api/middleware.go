@@ -9,7 +9,7 @@ import (
 	"github.com/suv-900/kl/user_service/internal/utils"
 )
 
-// adds user with the request...if any
+// adds user with the request
 func (app *application) authenticator(next http.HandlerFunc) http.HandlerFunc {
 
 	fn := func(w http.ResponseWriter, r *http.Request) {
@@ -21,12 +21,20 @@ func (app *application) authenticator(next http.HandlerFunc) http.HandlerFunc {
 			next.ServeHTTP(w, r)
 			return
 		}
-
+		//if my header is incomplete should i response with bad request or
 		headerParts := strings.Split(authorizationHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
 			//unknown request send 401 response
+			app.invalidAuthenticationHeader(w)
 		}
 
+		//expired malformed token or empty string
+		userid, err := VerifyToken(headerParts[1])
+		if err != nil {
+			app.invalidToken(w)	
+		}
+
+		user,err:=data.
 	}
 
 	return fn
