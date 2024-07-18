@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	ErrRecordNotFound = errors.New("user not found.")
 	ErrConflict       = errors.New("user already exists.")
 	ErrUnknown        = errors.New("unknown error occured")
 	ErrInternalServer = errors.New("internal server error.")
@@ -33,6 +34,7 @@ type User struct {
 
 var AnonymousUser = &User{}
 
+// pointer reciever avoids copy of the struct
 // pointer reciever methods have write access to struct fields
 // value reciever methods have read access to struct fields
 type UserModel struct {
@@ -51,8 +53,18 @@ func (u UserModel) AddUser(user *User) error {
 
 func (u UserModel) GetUser(userid uint) (*User, error) {
 	var user User
-	t := u.DB.First(&user, userid)
-	return &user, t.Error
+
+	err := u.DB.First(&user, userid).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, ErrInternalServer
+		}
+	}
+	return &user, nil
 }
 
 func (u UserModel) UpdateUser(user *User) error {
