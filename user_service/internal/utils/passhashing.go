@@ -8,7 +8,6 @@ func GenerateHashedPassword(password []byte) (string, error) {
 	var hashedpass string
 	hashedbytes, err := bcrypt.GenerateFromPassword(password, 3)
 	if err != nil {
-		log.Error(err)
 		return hashedpass, err
 	}
 	return string(hashedbytes), nil
