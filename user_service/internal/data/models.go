@@ -2,7 +2,7 @@ package data
 
 import "gorm.io/gorm"
 
-type Model struct {
+type Models struct {
 	Users interface {
 		AddUser(user *User) error
 		GetUser(userid uint) (*User, error)
@@ -15,8 +15,8 @@ type Model struct {
 	}
 }
 
-func GetModel(db *gorm.DB) *Model {
-	return &Model{
+func GetModel(db *gorm.DB) *Models {
+	return &Models{
 		Users:  UserModel{DB: db},
 		Images: ImageModel{DB: db},
 	}
