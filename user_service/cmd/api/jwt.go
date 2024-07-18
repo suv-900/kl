@@ -1,17 +1,16 @@
-package utils
+package api
 
 import (
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/suv-900/kl/user_service/internal/logging"
 )
 
 // var JWTKEY = common.Config.JWTkey
-var JWTKEY = "JWTKEY"
+var jwtKey = "JWTKEY"
 var tokenExpiryTime = time.Now().Add(60 * time.Minute)
-
-var log = logging.GetLogger()
+var ErrTokenInvalid = errors.New("token invalid")
 
 type CustomPayload struct {
 	ID uint `json:"id"`
@@ -26,24 +25,25 @@ func GenerateToken(userid uint) (string, error) {
 		},
 	}
 	rawToken := jwt.NewWithClaims(jwt.SigningMethodHS256, payload)
-	token, err := rawToken.SignedString(JWTKEY)
+	token, err := rawToken.SignedString(jwtKey)
 	return token, err
 }
 
 // i dont even know what i want
 // tokenExpired id tokenInvalid
-func ValidateToken(token string) (bool, uint, bool) {
-	var id uint
+func VerifyToken(token string) (uint, error) {
+	var userid uint
 	t, err := jwt.ParseWithClaims(token, &CustomPayload{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(JWTKEY), nil
+		return []byte(jwtKey), nil
 	})
 	if err != nil {
-		log.Error(err)
-		return true, id, false
+		//this probably means token is expired
+		return userid, err
 	}
 	if p, ok := t.Claims.(*CustomPayload); ok && t.Valid {
-		id = p.ID
-		return false, id, false
+		//this probably means token is invalid
+		userid = p.ID
+		return userid, nil
 	}
-	return false, id, true
+	return userid, ErrTokenInvalid
 }
