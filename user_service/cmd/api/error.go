@@ -22,3 +22,13 @@ func (app *application) invalidToken(w http.ResponseWriter) {
 	message := "token invalid"
 	app.sendErrorResponse(w, http.StatusUnauthorized, message)
 }
+
+func (app *application) invalidTokenDeletedUser(w http.ResponseWriter) {
+	message := "user is deleted[dead token] please create new account."
+	app.sendErrorResponse(w, http.StatusNotFound, message)
+}
+
+func (app *application) internalServerError(w http.ResponseWriter) {
+	message := "server error"
+	app.sendErrorResponse(w, http.StatusInternalServerError, message)
+}

@@ -1,12 +1,14 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/suv-900/kl/user_service/internal/data"
 	"github.com/suv-900/kl/user_service/internal/utils"
+	"gorm.io/gorm"
 )
 
 // adds user with the request
@@ -21,20 +23,35 @@ func (app *application) authenticator(next http.HandlerFunc) http.HandlerFunc {
 			next.ServeHTTP(w, r)
 			return
 		}
-		//if my header is incomplete should i response with bad request or
+
 		headerParts := strings.Split(authorizationHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			//unknown request send 401 response
+			//invalid request header send 401 response
 			app.invalidAuthenticationHeader(w)
+			return
 		}
 
 		//expired malformed token or empty string
 		userid, err := VerifyToken(headerParts[1])
 		if err != nil {
-			app.invalidToken(w)	
+			app.invalidToken(w)
+			return
 		}
 
-		user,err:=data.
+		//not accounted errors yet
+		user, err := Models.Users.GetUser(userid)
+		if err != nil {
+			switch {
+			case errors.Is(err, gorm.ErrRecordNotFound):
+				app.invalidTokenDeletedUser(w)
+			default:
+				app.internalServerError(w)
+			}
+		}
+
+		app.contextSetUser(r, user)
+
+		next.ServeHTTP(w, r)
 	}
 
 	return fn
