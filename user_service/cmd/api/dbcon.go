@@ -3,12 +3,13 @@ package api
 import (
 	"fmt"
 
+	"github.com/suv-900/kl/user_service/internal/data"
 	"github.com/suv-900/kl/user_service/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-var db *gorm.DB
+var Models *data.Models
 
 func Init() error {
 	var err error
@@ -18,7 +19,7 @@ func Init() error {
 		common.Config.DBPassword,
 		common.Config.DBName)
 
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Errorf("couldnt connect to DB :%s", err)
 		return err
@@ -33,5 +34,11 @@ func Init() error {
 
 	log.Info("schema migraton successfull.")
 
+	setModel(db)
+
 	return nil
+}
+
+func setModel(db *gorm.DB) {
+	Models = data.GetModel(db)
 }
