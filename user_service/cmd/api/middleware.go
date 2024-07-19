@@ -5,16 +5,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/suv-900/kl/user_service/internal/data"
-	"github.com/suv-900/kl/user_service/internal/utils"
-	"gorm.io/gorm"
 )
 
 // adds user with the request
 func (app *application) authenticator(next http.HandlerFunc) http.HandlerFunc {
 
-	fn := func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		authorizationHeader := r.Header.Get("Authorization")
 
@@ -27,25 +24,25 @@ func (app *application) authenticator(next http.HandlerFunc) http.HandlerFunc {
 		headerParts := strings.Split(authorizationHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
 			//invalid request header send 401 response
-			app.invalidAuthenticationHeader(w)
+			app.invalidAuthenticationHeader(w, r)
 			return
 		}
 
 		//expired malformed token or empty string
-		userid, err := VerifyToken(headerParts[1])
+		userid, err := app.verifyToken(headerParts[1])
 		if err != nil {
-			app.invalidToken(w)
+			app.invalidToken(w, r)
 			return
 		}
 
 		//not accounted errors yet
-		user, err := Models.Users.GetUser(userid)
+		user, err := app.models.Users.GetUser(userid)
 		if err != nil {
 			switch {
-			case errors.Is(err, gorm.ErrRecordNotFound):
-				app.invalidTokenDeletedUser(w)
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidTokenDeletedUser(w, r)
 			default:
-				app.internalServerError(w)
+				app.internalServerError(w, r)
 			}
 		}
 
@@ -54,32 +51,18 @@ func (app *application) authenticator(next http.HandlerFunc) http.HandlerFunc {
 		next.ServeHTTP(w, r)
 	}
 
-	return fn
 }
 
-func TokenMiddleware() gin.HandlerFunc {
+// ordinary function , HandlerFunc(w,r)->(ServeHTTP) , Handler(ServeHTTP)
+func (app *application) requireAuthentication(next *http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-	return func(c *gin.Context) {
-		token := c.GetHeader("token")
+		user := app.contextGetUser(r)
 
-		if len(token) == 0 {
-			c.Status(http.StatusUnauthorized)
-			c.Abort()
+		if user.IsAnonymousUser() {
+			app.authenticationRequired(w, r)
 			return
 		}
-		tokenExpired, userid, tokenInvalid := utils.ValidateToken(token)
-
-		if tokenExpired {
-			c.Status(http.StatusBadRequest)
-			c.Abort()
-			return
-		}
-		if tokenInvalid {
-			c.Status(http.StatusUnauthorized)
-			c.Abort()
-			return
-		}
-		c.Set("userid", userid)
-		c.Next()
+		next.ServeHTTP(w, r)
 	}
 }
