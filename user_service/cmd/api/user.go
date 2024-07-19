@@ -2,14 +2,16 @@ package api
 
 import (
 	"errors"
+	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/suv-900/kl/user_service/internal/data"
 )
 
-var imagesDir = "/home/core/go/kl/user_service/store/images"
+var imagesDir = "/home/core/go/kl/user_service/store/images/"
 
 func (app *application) Ping(c *gin.Context) {
 	c.JSON(http.StatusOK, "pong")
@@ -105,105 +107,69 @@ func (app *application) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+func (app *application) UpdateUserDetails(w http.ResponseWriter, r *http.Request) {
+	var user data.User
 
-func UpdateUserProfile(c *gin.Context) {
-	//get userid
-	//handler failure log it out
-	value, exists := c.Get("userid")
-	if !exists {
-		log.Error("userid not found in context map")
-		c.Status(http.StatusInternalServerError)
+	if err := app.models.Users.UpdateUser(&user); err != nil {
+		app.internalServerError(w, r)
 		return
 	}
 
-	if value == nil {
-		log.Error("Unknown state:userid is nil")
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	var userProfile models.UserProfile
-
-	if err := c.ShouldBindJSON(&userProfile); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-}
-func GetUserProfilePicture(c *gin.Context) {
-	image, err := dao.GetUserProfilePicture()
-	if err != nil {
-		log.Error(err)
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-	c.Status(http.StatusOK)
-	c.File(image.Location)
+	w.WriteHeader(http.StatusOK)
 }
 
-// get userid from context map
-func AddProfilePicture(c *gin.Context) {
-	val, found := c.Get("userid")
-	if !found {
-		log.Error("userid not found in context map")
-		return
-	}
-}
-
-func UpdateProfilePicture(c *gin.Context) {
-
+func (app *application) GetUserProfilePicture(w http.ResponseWriter, r *http.Request) {
 	var userid uint
-	f, err := c.FormFile("image")
+	//read params
+	image, err := app.models.Images.GetProfilePicture(userid)
 	if err != nil {
-		log.Error(err)
-		c.Status(http.StatusBadRequest)
+		app.internalServerError(w, r)
 		return
 	}
 
-	dest := imagesDir + "/" + f.Filename
-	log.Info(dest)
-	if err := c.SaveUploadedFile(f, dest); err != nil {
-		log.Error(err)
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-	image := &models.Image{}
-
-	image.UserID = userid
-	image.Name = f.Filename
-	image.Size = f.Size
-	image.Location = dest
-
-	if err := dao.UpdateProfilePicture(image); err != nil {
-		log.Error(err)
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	log.Info("Image added.")
-	c.Status(http.StatusOK)
+	http.ServeFile(w, r, image.Location)
 }
 
-func SaveVideo(c *gin.Context) {
-	f, err := c.FormFile("video")
+func (app *application) UpdateProfilePicture(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
-		log.Error(err)
-		c.Status(http.StatusBadRequest)
+		app.fileSizeLimitExceded(w, r)
 		return
 	}
 
-	dest := videosDir + "/" + f.Filename
-	log.Info(dest)
-	if err := c.SaveUploadedFile(f, dest); err != nil {
-		log.Error(err)
-		c.Status(http.StatusInternalServerError)
+	file, h, err := r.FormFile("image")
+	if err != nil {
+		app.internalServerError(w, r)
 		return
 	}
-	c.Status(http.StatusOK)
-}
-func ServerVideo(c *gin.Context) {
-	c.Status(http.StatusOK)
-	c.File(videosDir + "/dogvideo.mp4")
+
+	user := app.contextGetUser(r)
+
+	image := &data.Image{
+		UserID:   user.ID,
+		Size:     h.Size,
+		Location: imagesDir + h.Filename,
+	}
+
+	if err := app.models.Images.UpdateProfilePicture(image); err != nil {
+		app.internalServerError(w, r)
+		return
+	}
+
+	destfile, err := os.Create(imagesDir + h.Filename)
+	if err != nil {
+		app.internalServerError(w, r)
+		return
+	}
+	defer destfile.Close()
+
+	_, err = io.Copy(destfile, file)
+	if err != nil {
+		app.internalServerError(w, r)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // use protobufs

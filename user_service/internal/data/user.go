@@ -4,16 +4,15 @@ import (
 	"errors"
 	"time"
 
-	"github.com/suv-900/kl/user_service/internal/utils"
 	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
 )
 
 var (
-	ErrRecordNotFound = errors.New("user not found.")
-	ErrConflict       = errors.New("user already exists.")
+	ErrRecordNotFound = errors.New("user not found")
+	ErrConflict       = errors.New("user already exists")
 	ErrUnknown        = errors.New("unknown error occured")
-	ErrInternalServer = errors.New("internal server error.")
+	ErrInternalServer = errors.New("internal server error")
 )
 
 type User struct {
@@ -34,6 +33,10 @@ type User struct {
 
 var AnonymousUser = &User{}
 
+func (u *User) IsAnonymousUser() bool {
+	return u == AnonymousUser
+}
+
 // pointer reciever avoids copy of the struct
 // pointer reciever methods have write access to struct fields
 // value reciever methods have read access to struct fields
@@ -42,11 +45,6 @@ type UserModel struct {
 }
 
 func (u UserModel) AddUser(user *User) error {
-	var err error
-	user.Password, err = utils.GenerateHashedPassword([]byte(user.Password))
-	if err != nil {
-		return ErrInternalServer
-	}
 	t := u.DB.Create(user)
 	return t.Error
 }
@@ -86,9 +84,9 @@ func (u UserModel) GetUserPassword(username string) (string, error) {
 	var pass string
 	r := u.DB.Where("username = ?", username).Select("password").Find(&pass)
 	if r.RowsAffected == 0 {
-		return "", errors.New("user not found to retreive password")
+		return pass, ErrRecordNotFound
 	}
-	return pass, nil
+	return pass, r.Error
 }
 
 func (u UserModel) ChangePassword(userid uint, password string) error {
@@ -119,10 +117,10 @@ func (u UserModel) FindSoftDeletedRecords() ([]User, error) {
 // 	case err == "23505":
 // 		return ErrConflict
 
-// 	default:
-// 		return ErrUnknown
-// 	}
-// }
+//		default:
+//			return ErrUnknown
+//		}
+//	}
 
 // sneaky
 type LoginAttemptsResult struct {

@@ -11,7 +11,6 @@ type Image struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	Name     string
 	Size     int64
 	Location string
 	UserID   uint
