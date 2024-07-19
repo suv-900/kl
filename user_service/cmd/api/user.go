@@ -1,158 +1,109 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/suv-900/kl/user_service/dao"
-	"github.com/suv-900/kl/user_service/logging"
-	"github.com/suv-900/kl/user_service/models"
-	"github.com/suv-900/kl/user_service/utils"
+	"github.com/suv-900/kl/user_service/internal/data"
 )
 
-var videosDir = "/home/core/go/kl/user_service/store/videos"
 var imagesDir = "/home/core/go/kl/user_service/store/images"
 
-var log = logging.GetLogger()
-
-func Ping(c *gin.Context) {
+func (app *application) Ping(c *gin.Context) {
 	c.JSON(http.StatusOK, "pong")
 }
-
-func AddUser(c *gin.Context) {
-	var user models.User
-	err := c.ShouldBindJSON(&user)
-	if err != nil {
-		c.Status(http.StatusUnprocessableEntity)
-		return
-	}
-	err = user.Validate()
-	if err != nil {
-		c.Status(http.StatusBadRequest)
-		return
-	}
-
-	user.Password, err = utils.GenerateHashedPassword([]byte(user.Password))
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	if err := dao.AddUser(user); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	var token string
-	if token, err = utils.GenerateToken(user.ID); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	//fix
-	c.SetCookie("token", token, 3600, "/", "localhost", false, true)
-	c.Status(http.StatusCreated)
+func (app *application) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	var user data.User
+	//implement READJSON
 }
 
-func LoginUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.Status(http.StatusUnprocessableEntity)
-		return
+func (app *application) LoginUser(w http.ResponseWriter, r *http.Request) {
+
+	var userLogin struct {
+		username string `json:"username"`
+		password string `json:"password"`
 	}
-	if len(user.Username) == 0 || len(user.Password) == 0 {
-		c.Status(http.StatusBadRequest)
-		return
-	}
+
+	//READJSON
 
 	//check login attempts
-	loginAttempts, err := dao.GetLoginAttempts(user.Username)
+	loginAttempts, err := app.models.Users.GetLoginAttempts(userLogin.username)
 	if err != nil {
-		log.Error("error while getting login attempts details ", err)
-		c.Status(http.StatusInternalServerError)
+		app.internalServerError(w, r)
 		return
 	}
 
+	//avoid hardcoding
 	if loginAttempts.FailedLoginAttempts > 5 {
 		timeNow := time.Now()
 		timeDiff := loginAttempts.FailedLoginTime.Sub(timeNow)
 
 		if timeDiff.Abs().Hours() < 2 {
-			c.Status(http.StatusUnauthorized)
+			//try again after this hours
 			return
 		} else {
-			//set login attempts to 0
-			err = dao.ResetLoginAttempts(user.Username)
-			if err != nil {
+			if err := app.models.Users.ResetLoginAttempts(userLogin.username); err != nil {
 				log.Error("error while reseting login attempts ", err)
-				c.Status(http.StatusInternalServerError)
+				app.internalServerError(w, r)
 				return
 			}
 		}
 	}
 
-	dbpassword, err := dao.GetUserPassword(user.Username)
+	dbpassword, err := app.models.Users.GetUserPassword(userLogin.username)
 	if err != nil {
-		c.JSON(http.StatusNotFound, err)
-		return
-	}
-	if mismatch := utils.ComparePassword([]byte(user.Password), []byte(dbpassword)); mismatch != nil {
-		if err := dao.UpdateLoginAttempts(user.Username); err != nil {
-			log.Error("error while updating login attempts ", err)
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.userNotFound(w, r)
+		default:
+			app.internalServerError(w, r)
 		}
-		c.Status(http.StatusUnauthorized)
 		return
 	}
 
-	c.Status(http.StatusOK)
-}
-func CheckUserExists(c *gin.Context) {
-	username := c.Param("username")
-	if len(username) == 0 {
-		c.Status(http.StatusBadRequest)
+	if mismatch := app.comparePassword([]byte(userLogin.password), []byte(dbpassword)); mismatch != nil {
+		if err := app.models.Users.UpdateLoginAttempts(userLogin.username); err != nil {
+			log.Error("error while updating login attempts ", err)
+			app.internalServerError(w, r)
+			return
+		}
+		app.wrongcredentials(w, r)
 		return
 	}
-	if exists := dao.CheckUserExists(username); exists {
-		c.Status(http.StatusConflict)
-		return
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (app *application) CheckUserExists(w http.ResponseWriter, r *http.Request) {
+	var username string
+
+	if exists := app.models.Users.CheckUserExists(username); exists {
+		app.userExists(w, r)
 	} else {
-		c.Status(http.StatusOK)
-		return
+		w.WriteHeader(http.StatusOK)
 	}
 }
-func UpdatePassword(c *gin.Context) {
-	token := c.GetHeader("token")
 
-	tokenExpired, userid, tokenInvalid := utils.ValidateToken(token)
-
-	if tokenExpired {
-		c.Status(http.StatusBadRequest)
-		return
-	}
-	if tokenInvalid {
-		c.Status(http.StatusUnauthorized)
-	}
-
+func (app *application) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	//READJSON
 	var password string
-	if err := c.ShouldBindJSON(&password); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
 
-	password, err := utils.GenerateHashedPassword([]byte(password))
+	user := app.contextGetUser(r)
+
+	hashedpassword, err := app.generateHashedPassword([]byte(password))
 	if err != nil {
-		c.Status(http.StatusInternalServerError)
+		app.internalServerError(w, r)
 		return
 	}
 
-	err = dao.ChangePassword(userid, password)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
+	if err := app.models.Users.ChangePassword(user.ID, hashedpassword); err != nil {
+		app.internalServerError(w, r)
 		return
 	}
 
-	c.Status(http.StatusOK)
+	w.WriteHeader(http.StatusOK)
 }
 
 func UpdateUserProfile(c *gin.Context) {
