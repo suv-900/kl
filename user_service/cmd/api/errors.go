@@ -42,3 +42,18 @@ func (app *application) routeNotFound(w http.ResponseWriter, r *http.Request) {
 	message := "route not available."
 	app.sendErrorResponse(w, http.StatusNotFound, message)
 }
+
+func (app *application) wrongcredentials(w http.ResponseWriter, r *http.Request) {
+	message := "wrong credentials."
+	app.sendErrorResponse(w, http.StatusUnauthorized, message)
+}
+
+func (app *application) userNotFound(w http.ResponseWriter, r *http.Request) {
+	message := "user not found"
+	app.sendErrorResponse(w, http.StatusNotFound, message)
+}
+
+func (app *application) userExists(w http.ResponseWriter, r *http.Request) {
+	message := "user exists."
+	app.sendErrorResponse(w, http.StatusConflict, message)
+}
