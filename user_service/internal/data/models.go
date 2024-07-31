@@ -5,13 +5,13 @@ import "gorm.io/gorm"
 type Models struct {
 	Users interface {
 		AddUser(user *User) error
-		GetUser(userid uint) (*User, error)
+		GetUser(userid uint64) (*User, error)
 		UpdateUser(user *User) error
 		DeleteUser(user *User) error
 
 		GetUserPassword(username string) (string, error)
-		CheckUserExists(username string) bool
-		ChangePassword(userid uint, password string) error
+		CheckUserExists(username string) (bool, error)
+		ChangePassword(userid uint64, password string) error
 
 		GetLoginAttempts(username string) (*LoginAttemptsResult, error)
 		ResetLoginAttempts(username string) error
@@ -22,7 +22,7 @@ type Models struct {
 	}
 	Images interface {
 		UpdateProfilePicture(image *Image) error
-		GetProfilePicture(userid uint) (*Image, error)
+		GetProfilePicture(userid uint64) (*Image, error)
 	}
 }
 

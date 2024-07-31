@@ -13,14 +13,14 @@ type Image struct {
 
 	Size     int64
 	Location string
-	UserID   uint
+	UserID   uint64
 	User     User `gorm:"constraint:OnDelete:CASCADE;"`
 }
 type ImageModel struct {
 	DB *gorm.DB
 }
 
-func (i ImageModel) GetProfilePicture(userid uint) (*Image, error) {
+func (i ImageModel) GetProfilePicture(userid uint64) (*Image, error) {
 	var image Image
 	t := i.DB.Where("user_id = ?", userid).Find(&image)
 	return &image, t.Error

@@ -7,31 +7,57 @@ import (
 	"os"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/suv-900/kl/user_service/internal/data"
 )
 
 var imagesDir = "/home/core/go/kl/user_service/store/images/"
 
-func (app *application) Ping(c *gin.Context) {
-	c.JSON(http.StatusOK, "pong")
-}
 func (app *application) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	var user data.User
-	//implement READJSON
+
+	err := app.readJSON(r, w, user)
+	if err != nil {
+		app.sendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	user.Password, err = app.generateHashedPassword([]byte(user.Password))
+	if err != nil {
+		app.internalServerError(w, r)
+		return
+	}
+
+	err = app.models.Users.AddUser(&user)
+	if err != nil {
+		app.internalServerError(w, r)
+		return
+	}
+
+	token, err := app.generateToken(user.ID)
+	if err != nil {
+		app.internalServerError(w, r)
+		return
+	}
+
+	w.Header().Add("Authentication-Token", token)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (app *application) LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	var userLogin struct {
-		username string `json:"username"`
-		password string `json:"password"`
+		Username string `json:"username"`
+		Password string `json:"password"`
 	}
 
-	//READJSON
+	err := app.readJSON(r, w, userLogin)
+	if err != nil {
+		app.sendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
 
 	//check login attempts
-	loginAttempts, err := app.models.Users.GetLoginAttempts(userLogin.username)
+	loginAttempts, err := app.models.Users.GetLoginAttempts(userLogin.Username)
 	if err != nil {
 		app.internalServerError(w, r)
 		return
@@ -46,7 +72,7 @@ func (app *application) LoginUser(w http.ResponseWriter, r *http.Request) {
 			//try again after this hours
 			return
 		} else {
-			if err := app.models.Users.ResetLoginAttempts(userLogin.username); err != nil {
+			if err := app.models.Users.ResetLoginAttempts(userLogin.Username); err != nil {
 				log.Error("error while reseting login attempts ", err)
 				app.internalServerError(w, r)
 				return
@@ -54,7 +80,7 @@ func (app *application) LoginUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	dbpassword, err := app.models.Users.GetUserPassword(userLogin.username)
+	dbpassword, err := app.models.Users.GetUserPassword(userLogin.Username)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -65,8 +91,8 @@ func (app *application) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if mismatch := app.comparePassword([]byte(userLogin.password), []byte(dbpassword)); mismatch != nil {
-		if err := app.models.Users.UpdateLoginAttempts(userLogin.username); err != nil {
+	if mismatch := app.comparePassword([]byte(userLogin.Password), []byte(dbpassword)); mismatch != nil {
+		if err := app.models.Users.UpdateLoginAttempts(userLogin.Username); err != nil {
 			log.Error("error while updating login attempts ", err)
 			app.internalServerError(w, r)
 			return
@@ -81,16 +107,36 @@ func (app *application) LoginUser(w http.ResponseWriter, r *http.Request) {
 func (app *application) CheckUserExists(w http.ResponseWriter, r *http.Request) {
 	var username string
 
-	if exists := app.models.Users.CheckUserExists(username); exists {
+	err := app.readJSON(r, w, username)
+	if err != nil {
+		app.sendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	exists, err := app.models.Users.CheckUserExists(username)
+	if err != nil {
+		log.Error(err)
+		app.internalServerError(w, r)
+		return
+	}
+
+	if exists {
 		app.userExists(w, r)
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
+
 }
 
 func (app *application) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	//READJSON
 	var password string
+
+	err := app.readJSON(r, w, password)
+	if err != nil {
+		app.sendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
 
 	user := app.contextGetUser(r)
 
@@ -108,9 +154,24 @@ func (app *application) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 func (app *application) UpdateUserDetails(w http.ResponseWriter, r *http.Request) {
-	var user data.User
 
-	if err := app.models.Users.UpdateUser(&user); err != nil {
+	var userDetails struct {
+		Bio       string    `json:"bio"`
+		BirthDate time.Time `json:"birthdate"`
+	}
+
+	err := app.readJSON(r, w, userDetails)
+	if err != nil {
+		app.sendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	user := app.contextGetUser(r)
+
+	user.Bio = userDetails.Bio
+	user.BirthDate = userDetails.BirthDate
+
+	if err := app.models.Users.UpdateUser(user); err != nil {
 		app.internalServerError(w, r)
 		return
 	}
@@ -119,8 +180,14 @@ func (app *application) UpdateUserDetails(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) GetUserProfilePicture(w http.ResponseWriter, r *http.Request) {
-	var userid uint
-	//read params
+	var userid uint64
+
+	userid, err := app.readParamID(r)
+	if err != nil {
+		app.sendErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
 	image, err := app.models.Images.GetProfilePicture(userid)
 	if err != nil {
 		app.internalServerError(w, r)
@@ -172,25 +239,23 @@ func (app *application) UpdateProfilePicture(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 }
 
-// use protobufs
-func GetDeletedUsers(c *gin.Context) {
-	deletedUsers, err := dao.FindSoftDeletedRecords()
+func (app *application) GetDeletedUsers(w http.ResponseWriter, r *http.Request) {
+	allDeletedUsers, err := app.models.Users.FindSoftDeletedRecords()
 	if err != nil {
-		log.Error(err)
-		c.Status(http.StatusInternalServerError)
+		app.internalServerError(w, r)
 		return
 	}
 
-	c.JSON(http.StatusOK, deletedUsers)
+	app.writeJSON(w, envelope{"deleted_users": allDeletedUsers}, http.StatusOK)
 }
 
 // probably huge
-func GetAllActiveUsers(c *gin.Context) {
-	activeUsers, err := dao.FindActiveUsers()
+func (app *application) GetAllActiveUsers(w http.ResponseWriter, r *http.Request) {
+	activeUsers, err := app.models.Users.FindActiveUsers()
 	if err != nil {
-		log.Error(err)
-		c.Status(http.StatusInternalServerError)
+		app.internalServerError(w, r)
 		return
 	}
-	c.JSON(http.StatusOK, activeUsers)
+
+	app.writeJSON(w, envelope{"deleted_users": activeUsers}, http.StatusOK)
 }

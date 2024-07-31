@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -16,7 +17,7 @@ var (
 )
 
 type User struct {
-	ID        uint `gorm:"primarykey"`
+	ID        uint64 `gorm:"primarykey"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
@@ -34,7 +35,7 @@ type User struct {
 var AnonymousUser = &User{}
 
 func (u *User) IsAnonymousUser() bool {
-	return u == AnonymousUser
+	return *u == *AnonymousUser
 }
 
 // pointer reciever avoids copy of the struct
@@ -45,84 +46,141 @@ type UserModel struct {
 }
 
 func (u UserModel) AddUser(user *User) error {
-	t := u.DB.Create(user)
-	return t.Error
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Create(user).Error
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrDuplicatedKey):
+			return ErrConflict
+		default:
+			return ErrInternalServer
+		}
+	}
+	return nil
 }
 
-func (u UserModel) GetUser(userid uint) (*User, error) {
+func (u UserModel) GetUser(userid uint64) (*User, error) {
 	var user User
 
-	err := u.DB.First(&user, userid).Error
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).First(&user, userid).Error
 
 	if err != nil {
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			return nil, ErrRecordNotFound
 		default:
-			return nil, ErrInternalServer
+			return nil, err
 		}
 	}
 	return &user, nil
 }
 
 func (u UserModel) UpdateUser(user *User) error {
-	t := u.DB.Save(user)
-	return t.Error
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Save(user).Error
+
+	return err
 }
 
 func (u UserModel) DeleteUser(user *User) error {
-	t := u.DB.Delete(user)
-	return t.Error
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Delete(user).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return ErrRecordNotFound
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
-func (u UserModel) CheckUserExists(username string) bool {
-	r := u.DB.Where(&User{Username: username})
-	return r.RowsAffected > 0
+func (u UserModel) CheckUserExists(username string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	r := u.DB.WithContext(ctx).Where(&User{Username: username})
+
+	if r.Error != nil {
+		return false, r.Error
+	}
+
+	return r.RowsAffected > 0, nil
 }
 
 func (u UserModel) GetUserPassword(username string) (string, error) {
 	var pass string
-	r := u.DB.Where("username = ?", username).Select("password").Find(&pass)
-	if r.RowsAffected == 0 {
-		return pass, ErrRecordNotFound
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Raw(`SELECT password FROM users WHERE username = ?`, username).Scan(&pass).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return pass, ErrRecordNotFound
+		default:
+			return pass, err
+		}
 	}
-	return pass, r.Error
+
+	return pass, nil
 }
 
-func (u UserModel) ChangePassword(userid uint, password string) error {
-	err := u.DB.Save(&User{ID: userid, Password: password}).Error
-	return err
+func (u UserModel) ChangePassword(userid uint64, password string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Raw(`UPDATE 
+	users SET password = ? WHERE user_id = ?`, password, userid).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return ErrRecordNotFound
+		default:
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (u UserModel) FindActiveUsers() ([]User, error) {
 	var users []User
-	t := u.DB.Where("active = ?", true).Find(&users)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	t := u.DB.WithContext(ctx).Where("active = ?", true).Find(&users)
+
 	return users, t.Error
 }
 func (u UserModel) FindSoftDeletedRecords() ([]User, error) {
 	var users []User
-	t := u.DB.Where("is_del = 1").Find(&users)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	t := u.DB.WithContext(ctx).Where("is_del = 1").Find(&users)
 	return users, t.Error
 }
 
-// func pgErrorAnalyser(err error) error {
-// 	if err == nil {
-// 		return nil
-// 	}
-
-// 	if e, ok := err.(*pq.Error); ok {
-// 		return pgErrorAnalyser(e.Code)
-// 	}
-// 	switch {
-// 	case err == "23505":
-// 		return ErrConflict
-
-//		default:
-//			return ErrUnknown
-//		}
-//	}
-
-// sneaky
 type LoginAttemptsResult struct {
 	FailedLoginAttempts uint
 	FailedLoginTime     time.Time
@@ -130,25 +188,66 @@ type LoginAttemptsResult struct {
 
 func (u UserModel) GetLoginAttempts(username string) (*LoginAttemptsResult, error) {
 	var result LoginAttemptsResult
-	t := u.DB.Raw("SELECT failed_login_attempts,failed_login_time FROM users WHERE username = ?", username).Scan(&result)
-	return &result, t.Error
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Raw(`SELECT 
+	failed_login_attempts,failed_login_time 
+	FROM users WHERE username = ?`, username).Scan(&result).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return &result, ErrRecordNotFound
+		default:
+			return &result, err
+		}
+	}
+
+	return &result, nil
 }
 
 func (u UserModel) UpdateLoginAttempts(username string) error {
-	t := u.DB.Raw(`UPDATE users SET
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Raw(`UPDATE users SET
 	failed_login_attempts = failed_login_attempts + 1,
-	failed_login_time = ? WHERE username = ?`, time.Now(), username)
-	return t.Error
+	failed_login_time = ? WHERE username = ?`, time.Now(), username).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return ErrRecordNotFound
+		default:
+			return err
+		}
+	}
+
+	return nil
+
 }
 func (u UserModel) ResetLoginAttempts(username string) error {
-	t := u.DB.Raw(`UPDATE users SET
-	failed_login_attempts = 0 WHERE username = ?`, username)
-	return t.Error
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := u.DB.WithContext(ctx).Raw(`UPDATE users SET
+	failed_login_attempts = 0 WHERE username = ?`, username).Error
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return ErrRecordNotFound
+		default:
+			return err
+		}
+	}
+
+	return nil
+
 }
-
-// see what are sql.Rows
-
-// no create for userprofile
 
 func (u User) Validate() error {
 	switch {

@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
-	"github.com/suv-900/kl/user_service/logging"
 )
 
 // Application Configuraton
@@ -24,9 +23,7 @@ var Config = configuration{}
 
 var defaultBcryptCost = 3
 
-var log = logging.GetLogger()
-
-func LoadEnv() error {
+func LoadEnvVars() error {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Error("Couldnt load .env: ", err)
@@ -76,12 +73,4 @@ func LoadEnv() error {
 	}
 
 	return nil
-}
-
-func init() {
-	log.Info("Init Config file.")
-	err := LoadEnv()
-	if err != nil {
-		log.Panic(err)
-	}
 }

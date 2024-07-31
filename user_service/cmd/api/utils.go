@@ -14,11 +14,11 @@ var tokenExpiryTime = time.Now().Add(60 * time.Minute)
 var ErrTokenInvalid = errors.New("token invalid")
 
 type CustomPayload struct {
-	ID uint `json:"id"`
+	ID uint64 `json:"id"`
 	jwt.StandardClaims
 }
 
-func (app *application) generateToken(userid uint) (string, error) {
+func (app *application) generateToken(userid uint64) (string, error) {
 	payload := CustomPayload{
 		ID: userid,
 		StandardClaims: jwt.StandardClaims{
@@ -30,8 +30,8 @@ func (app *application) generateToken(userid uint) (string, error) {
 	return token, err
 }
 
-func (app *application) verifyToken(token string) (uint, error) {
-	var userid uint
+func (app *application) verifyToken(token string) (uint64, error) {
+	var userid uint64
 	t, err := jwt.ParseWithClaims(token, &CustomPayload{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(jwtKey), nil
 	})

@@ -57,3 +57,8 @@ func (app *application) userExists(w http.ResponseWriter, r *http.Request) {
 	message := "user exists."
 	app.sendErrorResponse(w, http.StatusConflict, message)
 }
+
+func (app *application) fileSizeLimitExceded(w http.ResponseWriter, r *http.Request) {
+	message := "file should be less than 32mb"
+	app.sendErrorResponse(w, http.StatusBadRequest, message)
+}
